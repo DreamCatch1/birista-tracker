@@ -15,10 +15,13 @@ async function sheetPost(sheet, row) {
     return { ok: true, demo: true };
   }
   try {
+    const params = new URLSearchParams();
+    params.append("sheet", sheet);
+    params.append("row", JSON.stringify(row));
+
     const res = await fetch(APPS_SCRIPT_URL, {
       method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ sheet, row }),
+      body: params,
     });
     if (!res.ok) {
       throw new Error(`Server returned ${res.status}`);

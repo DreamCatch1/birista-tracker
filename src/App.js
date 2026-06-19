@@ -14,24 +14,61 @@ async function sheetPost(sheet, row) {
   if (!APPS_SCRIPT_URL) {
     return { ok: true, demo: true };
   }
-  try {
-    const params = new URLSearchParams();
-    params.append("sheet", sheet);
-    params.append("row", JSON.stringify(row));
+  return new Promise((resolve) => {
+    try {
+      const iframeName = "hiddenFrame_" + Date.now();
+      const iframe = document.createElement("iframe");
+      iframe.name = iframeName;
+      iframe.style.display = "none";
+      document.body.appendChild(iframe);
 
-    const res = await fetch(APPS_SCRIPT_URL, {
-      method: "POST",
-      body: params,
-    });
-    if (!res.ok) {
-      throw new Error(`Server returned ${res.status}`);
+      const form = document.createElement("form");
+      form.action = APPS_SCRIPT_URL;
+      form.method = "POST";
+      form.target = iframeName;
+
+      const sheetInput = document.createElement("input");
+      sheetInput.type = "hidden";
+      sheetInput.name = "sheet";
+      sheetInput.value = sheet;
+      form.appendChild(sheetInput);
+
+      const rowInput = document.createElement("input");
+      rowInput.type = "hidden";
+      rowInput.name = "row";
+      rowInput.value = JSON.stringify(row);
+      form.appendChild(rowInput);
+
+      document.body.appendChild(form);
+
+      let settled = false;
+      const cleanup = () => {
+        if (settled) return;
+        settled = true;
+        setTimeout(() => {
+          form.remove();
+          iframe.remove();
+        }, 500);
+      };
+
+      iframe.onload = () => {
+        cleanup();
+        resolve({ ok: true });
+      };
+
+      form.submit();
+
+      // Fallback: assume success after 4s if onload never fires (some browsers)
+      setTimeout(() => {
+        if (!settled) {
+          cleanup();
+          resolve({ ok: true });
+        }
+      }, 4000);
+    } catch (err) {
+      resolve({ ok: false, error: err.message || "Submission failed" });
     }
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-    return data;
-  } catch (err) {
-    return { ok: false, error: err.message || "Network error — check your Apps Script deployment" };
-  }
+  });
 }
 
 async function sheetGet(sheet) {
